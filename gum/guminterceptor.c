@@ -1463,14 +1463,46 @@ _gum_function_context_begin_invocation (GumFunctionContext * function_ctx,
 
   if (function_ctx->replacement_function != NULL)
   {
-    stack_entry->calling_replacement = TRUE;
-    stack_entry->cpu_context = *cpu_context;
-    stack_entry->original_system_error = system_error;
-    invocation_ctx->cpu_context = &stack_entry->cpu_context;
-    invocation_ctx->backend = &interceptor_ctx->replacement_backend;
-    invocation_ctx->backend->data = function_ctx->replacement_data;
+    gboolean should_call_original = FALSE;
+    
+    // 检查 replacement_data 中的标志
+    if (function_ctx->replacement_data != NULL)
+    {
+      // 假设 replacement_data 指向 FunctionHookState 结构
+      // 使用 volatile 读取或原子操作确保可见性
+      FunctionHookState * state = (FunctionHookState *) function_ctx->replacement_data;
+      
+      // 使用内存屏障确保看到 on_enter 中的修改
+      // 注意：需要确保数据结构定义时使用了 volatile 或原子类型
+      should_call_original = g_atomic_int_get ((volatile gint *) &state->should_call_original);
+    }
 
-    *next_hop = function_ctx->replacement_function;
+    if (should_call_original)
+    {
+      // 直接跳转到原函数，不执行替换函数
+      // 注意：仍然需要设置必要的状态，以便 on_leave 能正常工作
+      if (will_trap_on_leave)
+      {
+        // 如果设置了 on_leave，需要标记这是"替换函数"调用
+        // 但实际上调用的是原函数，所以这里的处理需要仔细考虑
+        stack_entry->calling_replacement = FALSE;  // 或者保持为 TRUE，取决于你的需求
+        stack_entry->cpu_context = *cpu_context;
+        stack_entry->original_system_error = system_error;
+      }
+      
+      *next_hop = function_ctx->on_invoke_trampoline;
+    }
+    else
+    {
+      stack_entry->calling_replacement = TRUE;
+      stack_entry->cpu_context = *cpu_context;
+      stack_entry->original_system_error = system_error;
+      invocation_ctx->cpu_context = &stack_entry->cpu_context;
+      invocation_ctx->backend = &interceptor_ctx->replacement_backend;
+      invocation_ctx->backend->data = function_ctx->replacement_data;
+
+      *next_hop = function_ctx->replacement_function;
+    }
   }
   else
   {

@@ -56,6 +56,13 @@ typedef union _GumArm64VectorReg GumArm64VectorReg;
 typedef struct _GumMipsCpuContext GumMipsCpuContext;
 typedef guint GumRelocationScenario;
 
+// 每个函数的状态
+typedef struct _GumFunctionHookState GumFunctionHookState;
+struct _GumFunctionHookState {
+  volatile gint should_call_original;  // 使用 gint 以便使用原子操作
+  gpointer user_data;          // 用户数据
+};
+
 #if defined (_M_IX86) || defined (__i386__)
 # define GUM_NATIVE_CPU GUM_CPU_IA32
 # define GUM_DEFAULT_CS_ARCH CS_ARCH_X86
