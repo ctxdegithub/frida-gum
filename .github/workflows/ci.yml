@@ -9,7 +9,8 @@ on:
       - main
 
 env:
-  GUM_OPTIONS: '--enable-gumpp --enable-gumjs --with-devkits=gum,gumjs --enable-tests'
+  GUM_OPTIONS: '--with-devkits=gum --enable-tests'
+  # GUM_OPTIONS: '--enable-gumpp --enable-gumjs --with-devkits=gum,gumjs --enable-tests'
 
 jobs:
   gir:
