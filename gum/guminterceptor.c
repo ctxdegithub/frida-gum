@@ -1468,9 +1468,9 @@ _gum_function_context_begin_invocation (GumFunctionContext * function_ctx,
     // 检查 replacement_data 中的标志
     if (function_ctx->replacement_data != NULL)
     {
-      // 假设 replacement_data 指向 FunctionHookState 结构
+      // 假设 replacement_data 指向 GumFunctionHookState 结构
       // 使用 volatile 读取或原子操作确保可见性
-      FunctionHookState * state = (FunctionHookState *) function_ctx->replacement_data;
+      GumFunctionHookState * state = (GumFunctionHookState *) function_ctx->replacement_data;
       
       // 使用内存屏障确保看到 on_enter 中的修改
       // 注意：需要确保数据结构定义时使用了 volatile 或原子类型

@@ -23,8 +23,8 @@
 
 ```c
 // 函数 hook 状态结构
-typedef struct _FunctionHookState FunctionHookState;
-struct _FunctionHookState {
+typedef struct _GumFunctionHookState GumFunctionHookState;
+struct _GumFunctionHookState {
   gpointer function_address;        // 被 hook 的函数地址
   volatile gboolean should_call_original;  // 是否应该调用原函数（原子标志）
   // 可以使用原子操作或者加锁来保证线程安全
@@ -44,7 +44,7 @@ struct _FunctionHookState {
     // 检查 replacement_data 中的标志
     if (function_ctx->replacement_data != NULL)
     {
-      FunctionHookState * state = (FunctionHookState *) function_ctx->replacement_data;
+      GumFunctionHookState * state = (GumFunctionHookState *) function_ctx->replacement_data;
       
       // 使用原子操作或内存屏障读取标志
       // 注意：这里需要确保在 on_enter 中设置的标志能及时看到
@@ -139,9 +139,9 @@ _gum_function_context_begin_invocation (GumFunctionContext * function_ctx,
     // 检查 replacement_data 中的标志
     if (function_ctx->replacement_data != NULL)
     {
-      // 假设 replacement_data 指向 FunctionHookState 结构
+      // 假设 replacement_data 指向 GumFunctionHookState 结构
       // 使用 volatile 读取或原子操作确保可见性
-      FunctionHookState * state = (FunctionHookState *) function_ctx->replacement_data;
+      GumFunctionHookState * state = (GumFunctionHookState *) function_ctx->replacement_data;
       
       // 使用内存屏障确保看到 on_enter 中的修改
       // 注意：需要确保数据结构定义时使用了 volatile 或原子类型
@@ -204,7 +204,7 @@ static GMutex function_states_mutex = G_MUTEX_INIT;
 static gboolean
 get_should_call_original (gpointer function_address)
 {
-  FunctionHookState * state;
+  GumFunctionHookState * state;
   gboolean result = FALSE;
   
   g_mutex_lock (&function_states_mutex);
@@ -298,17 +298,17 @@ get_should_call_original (gpointer function_address)
 
 ```c
 // 每个函数的状态
-typedef struct _FunctionHookState FunctionHookState;
-struct _FunctionHookState {
+typedef struct _GumFunctionHookState GumFunctionHookState;
+struct _GumFunctionHookState {
   volatile gint should_call_original;  // 使用 gint 以便使用原子操作
   gpointer original_function;          // 保存原函数地址（可选）
 };
 
 // 初始化状态
-static FunctionHookState *
+static GumFunctionHookState *
 create_hook_state (void)
 {
-  FunctionHookState * state = g_new0 (FunctionHookState, 1);
+  GumFunctionHookState * state = g_new0 (GumFunctionHookState, 1);
   state->should_call_original = FALSE;  // 默认不调用原函数
   return state;
 }
@@ -324,7 +324,7 @@ on_enter_callback (GumInvocationContext * ic)
       GUM_FUNCPTR_TO_POINTER (ic->function));
   
   // 获取状态（通过 replacement_data 或全局表）
-  FunctionHookState * state = (FunctionHookState *) 
+  GumFunctionHookState * state = (GumFunctionHookState *) 
       gum_invocation_context_get_replacement_data (ic);
   
   if (state != NULL)
@@ -360,7 +360,7 @@ void setup_hook (void)
   GumInterceptor * interceptor = gum_interceptor_obtain ();
   gpointer target = (gpointer) target_function;
   gpointer original = NULL;
-  FunctionHookState * state = create_hook_state ();
+  GumFunctionHookState * state = create_hook_state ();
   GumInvocationListener * listener;
   
   // 注册替换函数（可以是空函数，因为不会真正调用）
@@ -475,8 +475,8 @@ gboolean should_call = g_atomic_int_get ((volatile gint *) &state->should_call_o
 
 ```c
 // ========== 状态结构 ==========
-typedef struct _FunctionHookState FunctionHookState;
-struct _FunctionHookState {
+typedef struct _GumFunctionHookState GumFunctionHookState;
+struct _GumFunctionHookState {
   volatile gint should_call_original;  // 原子标志
   gpointer original_function;
 };
@@ -491,7 +491,7 @@ struct _FunctionHookState {
     // 检查标志（通过 replacement_data）
     if (function_ctx->replacement_data != NULL)
     {
-      FunctionHookState * state = (FunctionHookState *) function_ctx->replacement_data;
+      GumFunctionHookState * state = (GumFunctionHookState *) function_ctx->replacement_data;
       should_call_original = g_atomic_int_get (
           (volatile gint *) &state->should_call_original) != 0;
     }
