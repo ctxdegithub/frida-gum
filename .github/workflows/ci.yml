@@ -309,8 +309,6 @@ jobs:
       matrix:
         id:
           - ios-arm64
-          - android-x86
-          - android-x86_64
           - android-arm
           - android-arm64
       fail-fast: false
