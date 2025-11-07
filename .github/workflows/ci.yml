@@ -309,7 +309,7 @@ jobs:
     strategy:
       matrix:
         id:
-          # - ios-arm64
+          - ios-arm64
           # - android-x86
           # - android-x86_64
           - android-arm
