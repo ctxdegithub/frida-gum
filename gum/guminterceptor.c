@@ -22,6 +22,8 @@
 # include <mach/mach.h>
 #endif
 
+#define GUM_MAX_RECURSION_DEPTH 32
+
 #ifdef HAVE_MIPS
 # define GUM_INTERCEPTOR_CODE_SLICE_SIZE 1024
 #else
@@ -1345,13 +1347,28 @@ _gum_function_context_begin_invocation (GumFunctionContext * function_ctx,
 #ifdef HAVE_WINDOWS
   system_error = gum_thread_get_system_error ();
 #endif
+  
+  // [修改] 获取当前是否已经加锁
+  gboolean already_locked = (gum_tls_key_get_value (gum_interceptor_guard_key) == interceptor);
 
-  if (gum_tls_key_get_value (gum_interceptor_guard_key) == interceptor)
+  if (already_locked)
   {
-    *next_hop = function_ctx->on_invoke_trampoline;
-    goto bypass;
+    // [修改] 如果已加锁，检查当前栈深度
+    InterceptorThreadContext * interceptor_ctx = get_interceptor_thread_context ();
+    
+    // 如果深度超过限制，或者正在调用 replacement（原版逻辑），则跳过
+    if (interceptor_ctx->stack->len >= GUM_MAX_RECURSION_DEPTH)
+    {
+      *next_hop = function_ctx->on_invoke_trampoline;
+      goto bypass;
+    }
+    // 否则：允许继续执行（即允许重入）
   }
-  gum_tls_key_set_value (gum_interceptor_guard_key, interceptor);
+  else
+  {
+    // 只有未加锁时才设置锁
+    gum_tls_key_set_value (gum_interceptor_guard_key, interceptor);
+  }
 
   interceptor_ctx = get_interceptor_thread_context ();
   stack = interceptor_ctx->stack;
@@ -1455,6 +1472,13 @@ _gum_function_context_begin_invocation (GumFunctionContext * function_ctx,
   gum_thread_set_system_error (system_error);
 
   gum_tls_key_set_value (gum_interceptor_guard_key, NULL);
+
+  // [修改] 只有在这一层是“最外层”（原本未加锁）时，才释放锁
+  // 如果是递归进来的 (already_locked == TRUE)，则保持锁的状态给外层用
+  if (!already_locked)
+  {
+    gum_tls_key_set_value (gum_interceptor_guard_key, NULL);
+  }
 
   if (will_trap_on_leave)
   {
@@ -1594,7 +1618,11 @@ _gum_function_context_end_invocation (GumFunctionContext * function_ctx,
 
   gum_invocation_stack_pop (interceptor_ctx->stack);
 
-  gum_tls_key_set_value (gum_interceptor_guard_key, NULL);
+// [修改] 只有当栈为空（说明所有嵌套调用都返回了）时，才彻底释放锁
+  if (interceptor_ctx->stack->len == 0)
+  {
+    gum_tls_key_set_value (gum_interceptor_guard_key, NULL);
+  }
 
   g_atomic_int_dec_and_test (&function_ctx->trampoline_usage_counter);
 }
